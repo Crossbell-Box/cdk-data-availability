@@ -32,6 +32,14 @@ To learn more about how the data availability layer works in the validium, pleas
 
 The off-chain data is stored in a distributed manner and managed by a data availability committee, ensuring that it is available for validation. The data availability committee is defined as a core smart contract, available [here](https://github.com/0xPolygon/cdk-validium-contracts/blob/main/contracts/CDKDataCommittee.sol). This is crucial for the Validium model, where data computation happens off-chain but needs to be verifiable on-chain.
 
+## Run
+
+```
+make build-docker
+cd test
+make run
+```
+
 ## License
 
 The cdk-validium-node project is licensed under the [GNU Affero General Public License](LICENSE) free software license.
