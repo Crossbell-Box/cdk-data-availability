@@ -2,21 +2,16 @@ package etherman
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"math/big"
-	"strings"
-
 	"github.com/0xPolygon/cdk-data-availability/config"
 	"github.com/0xPolygon/cdk-data-availability/etherman/smartcontracts/cdkdatacommittee"
-	"github.com/0xPolygon/cdk-data-availability/etherman/smartcontracts/cdkvalidium"
 	"github.com/0xPolygon/cdk-data-availability/log"
 	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"math/big"
 )
 
 type ethereumClient interface {
@@ -35,7 +30,6 @@ type ethereumClient interface {
 // Etherman is the implementation of EtherMan.
 type Etherman struct {
 	EthClient     ethereumClient
-	CDKValidium   *cdkvalidium.Cdkvalidium
 	DataCommittee *cdkdatacommittee.Cdkdatacommittee
 }
 
@@ -48,7 +42,6 @@ func New(cfg config.L1Config) (*Etherman, error) {
 		log.Errorf("error connecting to %s: %+v", cfg.WsURL, err)
 		return nil, err
 	}
-	cdkValidium, err := cdkvalidium.NewCdkvalidium(common.HexToAddress(cfg.CDKValidiumAddress), ethClient)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +52,6 @@ func New(cfg config.L1Config) (*Etherman, error) {
 	}
 	return &Etherman{
 		EthClient:     ethClient,
-		CDKValidium:   cdkValidium,
 		DataCommittee: dataCommittee,
 	}, nil
 }
@@ -67,11 +59,6 @@ func New(cfg config.L1Config) (*Etherman, error) {
 // GetTx function get ethereum tx
 func (e *Etherman) GetTx(ctx context.Context, txHash common.Hash) (*types.Transaction, bool, error) {
 	return e.EthClient.TransactionByHash(ctx, txHash)
-}
-
-// TrustedSequencer gets trusted sequencer address
-func (e *Etherman) TrustedSequencer() (common.Address, error) {
-	return e.CDKValidium.TrustedSequencer(&bind.CallOpts{Pending: false})
 }
 
 // DataCommitteeMember represents a member of the Data Committee
@@ -127,35 +114,4 @@ func (e *Etherman) GetCurrentDataCommitteeMembers() ([]DataCommitteeMember, erro
 		})
 	}
 	return members, nil
-}
-
-// ParseEvent unpacks the keys in a SequenceBatches event
-func ParseEvent(event *cdkvalidium.CdkvalidiumSequenceBatches, txData []byte) (uint64, []common.Hash, error) {
-	a, err := abi.JSON(strings.NewReader(cdkvalidium.CdkvalidiumABI))
-	if err != nil {
-		return 0, nil, err
-	}
-	method, err := a.MethodById(txData[:4])
-	if err != nil {
-		return 0, nil, err
-	}
-	data, err := method.Inputs.Unpack(txData[4:])
-	if err != nil {
-		return 0, nil, err
-	}
-	var batches []cdkvalidium.CDKValidiumBatchData
-	bytes, err := json.Marshal(data[0])
-	if err != nil {
-		return 0, nil, err
-	}
-	err = json.Unmarshal(bytes, &batches)
-	if err != nil {
-		return 0, nil, err
-	}
-
-	var keys []common.Hash
-	for _, batch := range batches {
-		keys = append(keys, batch.TransactionsHash)
-	}
-	return event.Raw.BlockNumber, keys, nil
 }

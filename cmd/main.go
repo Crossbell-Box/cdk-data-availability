@@ -1,23 +1,16 @@
 package main
 
 import (
-	"context"
 	"fmt"
-	"os"
-	"os/signal"
-	"time"
-
 	dataavailability "github.com/0xPolygon/cdk-data-availability"
 	"github.com/0xPolygon/cdk-data-availability/config"
 	"github.com/0xPolygon/cdk-data-availability/db"
-	"github.com/0xPolygon/cdk-data-availability/etherman"
 	"github.com/0xPolygon/cdk-data-availability/log"
 	"github.com/0xPolygon/cdk-data-availability/rpc"
 	"github.com/0xPolygon/cdk-data-availability/services/datacom"
 	"github.com/0xPolygon/cdk-data-availability/services/sync"
-	"github.com/0xPolygon/cdk-data-availability/synchronizer"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/urfave/cli/v2"
+	"os"
 )
 
 const appName = "cdk-data-availability"
@@ -75,48 +68,6 @@ func start(cliCtx *cli.Context) error {
 	if err != nil {
 		log.Fatal(err)
 	}
-	// Load EtherMan
-	etherman, err := etherman.New(c.L1)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// derive address
-	selfAddr := crypto.PubkeyToAddress(pk.PublicKey)
-
-	// ensure synchro/reorg start block is set
-	err = synchronizer.InitStartBlock(storage, c.L1)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	var cancelFuncs []context.CancelFunc
-
-	sequencerTracker, err := synchronizer.NewSequencerTracker(c.L1, etherman)
-	if err != nil {
-		log.Fatal(err)
-	}
-	go sequencerTracker.Start()
-	cancelFuncs = append(cancelFuncs, sequencerTracker.Stop)
-
-	detector, err := synchronizer.NewReorgDetector(c.L1.RpcURL, 1*time.Second)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = detector.Start()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	cancelFuncs = append(cancelFuncs, detector.Stop)
-
-	batchSynchronizer, err := synchronizer.NewBatchSynchronizer(c.L1, selfAddr, storage, detector.Subscribe(), etherman)
-	if err != nil {
-		log.Fatal(err)
-	}
-	go batchSynchronizer.Start()
-	cancelFuncs = append(cancelFuncs, batchSynchronizer.Stop)
 
 	// Register services
 	server := rpc.NewServer(
@@ -131,7 +82,7 @@ func start(cliCtx *cli.Context) error {
 				Service: datacom.NewDataComEndpoints(
 					storage,
 					pk,
-					sequencerTracker,
+					c.L1.BatcherAddr,
 				),
 			},
 		},
@@ -142,28 +93,9 @@ func start(cliCtx *cli.Context) error {
 		log.Fatal(err)
 	}
 
-	waitSignal(cancelFuncs)
 	return nil
 }
 
 func setupLog(c log.Config) {
 	log.Init(c)
-}
-
-func waitSignal(cancelFuncs []context.CancelFunc) {
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, os.Interrupt)
-
-	for sig := range signals {
-		switch sig {
-		case os.Interrupt, os.Kill:
-			log.Info("terminating application gracefully...")
-
-			exitStatus := 0
-			for _, cancel := range cancelFuncs {
-				cancel()
-			}
-			os.Exit(exitStatus)
-		}
-	}
 }

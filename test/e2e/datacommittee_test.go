@@ -187,7 +187,7 @@ func TestDataCommittee(t *testing.T) {
 
 func getSequenceBatchesEventIterator(clientL1 *ethclient.Client) (*cdkvalidium.CdkvalidiumSequenceBatchesIterator, error) {
 	// Get the expected data keys of the batches from what was submitted to L1
-	cdkValidium, err := cdkvalidium.NewCdkvalidium(common.HexToAddress(operations.DefaultL1CDKValidiumSmartContract), clientL1)
+	cdkValidium, err := cdkvalidium.NewCdkvalidium(common.HexToAddress(operations.DefaultBatcherAddr), clientL1)
 	if err != nil {
 		return nil, err
 	}
@@ -261,7 +261,7 @@ func startDACMember(t *testing.T, m member) {
 		L1: config.L1Config{
 			WsURL:                "ws://l1:8546",
 			RpcURL:               "http://l1:8545",
-			CDKValidiumAddress:   operations.DefaultL1CDKValidiumSmartContract,
+			BatcherAddr:          operations.DefaultBatcherAddr,
 			DataCommitteeAddress: operations.DefaultL1DataCommitteeContract,
 			Timeout:              cTypes.Duration{Duration: time.Second},
 			RetryPeriod:          cTypes.Duration{Duration: time.Second},

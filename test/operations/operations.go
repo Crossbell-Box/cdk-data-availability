@@ -30,15 +30,15 @@ const (
 	// DefaultInterval is a time interval
 	DefaultInterval = 2 * time.Second
 	// DefaultDeadline is a time interval
-	DefaultDeadline                          = 2 * time.Minute
-	DefaultL1NetworkURL                      = "http://localhost:8545"
-	DefaultL2NetworkURL                      = "http://localhost:8123"
-	DefaultSequencerPrivateKey               = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
-	DefaultL2ChainID                  uint64 = 1001
-	DefaultL1ChainID                  uint64 = 1337
-	DefaultL1DataCommitteeContract           = "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
-	DefaultTimeoutTxToBeMined                = 1 * time.Minute
-	DefaultL1CDKValidiumSmartContract        = "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82"
+	DefaultDeadline                       = 2 * time.Minute
+	DefaultL1NetworkURL                   = "http://localhost:8545"
+	DefaultL2NetworkURL                   = "http://localhost:8123"
+	DefaultSequencerPrivateKey            = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"
+	DefaultL2ChainID               uint64 = 1001
+	DefaultL1ChainID               uint64 = 1337
+	DefaultL1DataCommitteeContract        = "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
+	DefaultTimeoutTxToBeMined             = 1 * time.Minute
+	DefaultBatcherAddr                    = "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82"
 )
 
 var (

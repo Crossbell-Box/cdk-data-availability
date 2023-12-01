@@ -34,7 +34,7 @@ type Config struct {
 type L1Config struct {
 	WsURL                string         `mapstructure:"WsURL"`
 	RpcURL               string         `mapstructure:"RpcURL"`
-	CDKValidiumAddress   string         `mapstructure:"CDKValidiumAddress"`
+	BatcherAddr          string         `mapstructure:"BatcherAddr"`
 	DataCommitteeAddress string         `mapstructure:"DataCommitteeAddress"`
 	Timeout              types.Duration `mapstructure:"Timeout"`
 	RetryPeriod          types.Duration `mapstructure:"RetryPeriod"`
