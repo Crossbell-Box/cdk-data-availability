@@ -38,7 +38,7 @@ const (
 	DefaultL1ChainID               uint64 = 1337
 	DefaultL1DataCommitteeContract        = "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
 	DefaultTimeoutTxToBeMined             = 1 * time.Minute
-	DefaultBatcherAddr                    = "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82"
+	DefaultBatcherAddr                    = "0x8Bd30012e0995fF1dd104F860BC307eA6cb04D7C"
 )
 
 var (
@@ -71,10 +71,6 @@ func Poll(interval, deadline time.Duration, condition ConditionFunc) error {
 
 // ConditionFunc is a generic function
 type ConditionFunc func() (done bool, err error)
-
-func nodeUpCondition() (done bool, err error) {
-	return NodeUpCondition(DefaultL2NetworkURL)
-}
 
 func networkUpCondition() (bool, error) {
 	return NodeUpCondition(DefaultL1NetworkURL)
@@ -191,12 +187,8 @@ func stopNetwork() error {
 
 // Teardown stops all the components.
 func Teardown() error {
-	err := stopNode()
-	if err != nil {
-		return err
-	}
 
-	err = stopNetwork()
+	err := stopNetwork()
 	if err != nil {
 		return err
 	}
@@ -213,23 +205,12 @@ func Setup() error {
 		return err
 	}
 
-	// Run node container
-	err = StartNode()
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
 // StartNetwork starts the L1 network container
 func StartNetwork() error {
 	return StartComponent("network", networkUpCondition)
-}
-
-// StartNode starts the node container
-func StartNode() error {
-	return StartComponent("node", nodeUpCondition)
 }
 
 // GetAuth configures and returns an auth object.

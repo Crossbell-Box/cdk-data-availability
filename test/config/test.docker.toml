@@ -3,8 +3,8 @@ PrivateKey = {Path = "/pk/test-member.keystore", Password = "testonly"}
 [L1]
 WsURL = "ws://l1:8546"
 RpcURL = "http://l1:8545"
-BatcherAddr = "0x8Bd30012e0995fF1dd104F860BC307eA6cb04D7C"
-DataCommitteeAddress = "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6"
+BatcherAddr = "0xBad936e2FBfED0229e42f7b894D9ce166cb256DF"
+DataCommitteeAddress = "0xe0bdd0bd382d929ae4a3db78dc0258fe650e8e45"
 Timeout = "3m"
 RetryPeriod = "5s"
 BlockBatchSize = 32

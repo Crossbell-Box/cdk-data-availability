@@ -14,7 +14,7 @@ PrivateKey = {Path = "/pk/test-member.keystore", Password = "testonly"}
 [L1]
 WsURL = "ws://127.0.0.1:8546"
 RpcURL = "http://127.0.0.1:8545"
-BatcherAddr = "0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82"
+BatcherAddr = "0x8Bd30012e0995fF1dd104F860BC307eA6cb04D7C"
 DataCommitteeAddress = "0x0"
 Timeout = "1m"
 RetryPeriod = "5s"

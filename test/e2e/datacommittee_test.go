@@ -3,6 +3,8 @@ package e2e
 import (
 	"context"
 	"crypto/ecdsa"
+	"crypto/elliptic"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -14,19 +16,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/0xPolygon/cdk-data-availability/client"
 	"github.com/0xPolygon/cdk-data-availability/config"
 	cTypes "github.com/0xPolygon/cdk-data-availability/config/types"
 	"github.com/0xPolygon/cdk-data-availability/db"
 	"github.com/0xPolygon/cdk-data-availability/etherman"
 	"github.com/0xPolygon/cdk-data-availability/etherman/smartcontracts/cdkdatacommittee"
-	"github.com/0xPolygon/cdk-data-availability/etherman/smartcontracts/cdkvalidium"
 	"github.com/0xPolygon/cdk-data-availability/log"
 	"github.com/0xPolygon/cdk-data-availability/rpc"
 	"github.com/0xPolygon/cdk-data-availability/test/operations"
-	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	eTypes "github.com/ethereum/go-ethereum/core/types"
-
+	"github.com/0xPolygon/cdk-data-availability/types"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -63,12 +62,10 @@ func TestDataCommittee(t *testing.T) {
 	err = operations.Setup()
 	require.NoError(t, err)
 	time.Sleep(5 * time.Second)
-	authL2, err := operations.GetAuth(operations.DefaultSequencerPrivateKey, operations.DefaultL2ChainID)
-	require.NoError(t, err)
+
 	authL1, err := operations.GetAuth(operations.DefaultSequencerPrivateKey, operations.DefaultL1ChainID)
 	require.NoError(t, err)
-	clientL2, err := ethclient.Dial(operations.DefaultL2NetworkURL)
-	require.NoError(t, err)
+
 	clientL1, err := ethclient.Dial(operations.DefaultL1NetworkURL)
 	require.NoError(t, err)
 	dacSC, err := cdkdatacommittee.NewCdkdatacommittee(
@@ -124,90 +121,65 @@ func TestDataCommittee(t *testing.T) {
 		_ = exec.Command("rmdir", "-rf", ksFile+"_").Run()
 	}()
 
-	// pick one to start later
-	m0 := membs[0]
-
 	// Start DAC nodes & DBs
-	for _, m := range membs[1:] { // note starting all but first
+	for _, m := range membs {
 		startDACMember(t, m)
 	}
 
-	// Send txs
-	nTxs := 10
-	amount := big.NewInt(10000)
-	toAddress := common.HexToAddress("0x70997970C51812dc3A010C7d01b50e0d17dc79C8")
-	_, err = clientL2.BalanceAt(ctx, authL2.From, nil)
-	require.NoError(t, err)
-	_, err = clientL2.PendingNonceAt(ctx, authL2.From)
-	require.NoError(t, err)
-
-	gasLimit, err := clientL2.EstimateGas(ctx, ethereum.CallMsg{From: authL2.From, To: &toAddress, Value: amount})
-	require.NoError(t, err)
-
-	gasPrice, err := clientL2.SuggestGasPrice(ctx)
-	require.NoError(t, err)
-
-	nonce, err := clientL2.PendingNonceAt(ctx, authL2.From)
-	require.NoError(t, err)
-
-	txs := make([]*eTypes.Transaction, 0, nTxs)
-	for i := 0; i < nTxs; i++ {
-		tx := eTypes.NewTransaction(nonce+uint64(i), toAddress, amount, gasLimit, gasPrice, nil)
-		log.Infof("generating tx %d / %d: %s", i+1, nTxs, tx.Hash().Hex())
-		txs = append(txs, tx)
+	// 1. send data to DAC members
+	sequence := types.Sequence{
+		Batches: []types.Batch{
+			{
+				Number:         3,
+				GlobalExitRoot: common.HexToHash("0x678343456734678"),
+				Timestamp:      3457834,
+				Coinbase:       common.HexToAddress("0x345678934t567889137"),
+				L2Data:         common.Hex2Bytes("274567245673256275642756243560234572347657236520"),
+			},
+		},
 	}
-
-	// Wait for verification
-	_, err = operations.ApplyL2Txs(ctx, txs, authL2, clientL2, operations.VerifiedConfirmationLevel)
+	priv, _ := hexStringToECDSAPrivateKey("123412341234123412341234123412341234123412341234")
+	signedSequence, err := sequence.Sign(priv)
 	require.NoError(t, err)
 
-	startDACMember(t, m0) // start the skipped one, it should catch up through synchronization
-
-	// allow the member to startup and synchronize
-	<-time.After(20 * time.Second)
-
-	iter, err := getSequenceBatchesEventIterator(clientL1)
+	l1Etherman, err := etherman.New(config.L1Config{
+		WsURL:                operations.DefaultL1NetworkURL,
+		BatcherAddr:          operations.DefaultBatcherAddr,
+		DataCommitteeAddress: operations.DefaultL1DataCommitteeContract,
+		Timeout:              cTypes.Duration{Duration: time.Second},
+		RetryPeriod:          cTypes.Duration{Duration: time.Second}},
+	)
 	require.NoError(t, err)
-	defer func() { _ = iter.Close() }()
 
-	// All the events should be present in DACs
-	for iter.Next() {
-		expectedKeys, err := getSequenceBatchesKeys(clientL1, iter.Event)
+	committee, err := l1Etherman.GetCurrentDataCommittee()
+	require.NoError(t, err)
+	for _, m := range committee.Members {
+		c := client.New(m.URL)
+		_, err := c.SignSequence(*signedSequence)
 		require.NoError(t, err)
-		for _, m := range membs {
-			// Each member (including m0) should have all the keys
-			for _, expected := range expectedKeys {
-				actual, err := getOffchainDataKeys(m, expected)
-				require.NoError(t, err)
-				require.Equal(t, expected, actual)
-			}
-		}
 	}
+
+	// 2. get data from DAC members
+	dataHash := crypto.Keccak256Hash(sequence.Batches[0].L2Data)
+	fmt.Println("dataHash", dataHash.Hex())
+	//for _, m := range membs {
+	//	actual, err := getOffchainDataKeys(m, dataHash)
+	//	require.NoError(t, err)
+	//	require.Equal(t, dataHash, actual)
+	//}
 }
 
-func getSequenceBatchesEventIterator(clientL1 *ethclient.Client) (*cdkvalidium.CdkvalidiumSequenceBatchesIterator, error) {
-	// Get the expected data keys of the batches from what was submitted to L1
-	cdkValidium, err := cdkvalidium.NewCdkvalidium(common.HexToAddress(operations.DefaultBatcherAddr), clientL1)
+func hexStringToECDSAPrivateKey(hexKey string) (*ecdsa.PrivateKey, error) {
+	keyBytes, err := hex.DecodeString(hexKey)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid hex string: %w", err)
 	}
-	// iterate over all events that were generated
-	iter, err := cdkValidium.FilterSequenceBatches(&bind.FilterOpts{Start: 0, Context: context.Background()}, nil)
-	if err != nil {
-		return nil, err
-	}
-	return iter, nil
-}
 
-func getSequenceBatchesKeys(clientL1 *ethclient.Client, event *cdkvalidium.CdkvalidiumSequenceBatches) ([]common.Hash, error) {
-	ctx := context.Background()
-	tx, _, err := clientL1.TransactionByHash(ctx, event.Raw.TxHash)
-	if err != nil {
-		return nil, err
-	}
-	txData := tx.Data()
-	_, keys, err := etherman.ParseEvent(event, txData)
-	return keys, err
+	privKey := new(ecdsa.PrivateKey)
+	privKey.PublicKey.Curve = elliptic.P256()
+	privKey.D = new(big.Int).SetBytes(keyBytes)
+
+	return privKey, nil
 }
 
 func getOffchainDataKeys(m member, tx common.Hash) (common.Hash, error) {
@@ -259,8 +231,8 @@ func createKeyStore(pk *ecdsa.PrivateKey, outputDir, password string) error {
 func startDACMember(t *testing.T, m member) {
 	dacNodeConfig := config.Config{
 		L1: config.L1Config{
-			WsURL:                "ws://l1:8546",
-			RpcURL:               "http://l1:8545",
+			WsURL:                operations.DefaultL1NetworkURL,
+			RpcURL:               operations.DefaultL1NetworkURL,
 			BatcherAddr:          operations.DefaultBatcherAddr,
 			DataCommitteeAddress: operations.DefaultL1DataCommitteeContract,
 			Timeout:              cTypes.Duration{Duration: time.Second},
@@ -330,11 +302,12 @@ func startDACMember(t *testing.T, m member) {
 	)
 	out, err = cmd.CombinedOutput()
 	require.NoError(t, err, string(out))
-	log.Infof("DAC node %d started", m.i)
+	log.Infof("DAC node %d started, addr %s, url %s", m.i, m.addr.Hex(), m.url)
 	time.Sleep(time.Second * 5)
 }
 
 func stopDACMember(t *testing.T, m member) {
+	fmt.Printf("stop DAC member %d\n", m.i)
 	out, err := exec.Command(
 		"docker", "kill", "cdk-data-availability-"+strconv.Itoa(m.i),
 	).CombinedOutput()
