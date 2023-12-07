@@ -162,11 +162,11 @@ func TestDataCommittee(t *testing.T) {
 	// 2. get data from DAC members
 	dataHash := crypto.Keccak256Hash(sequence.Batches[0].L2Data)
 	fmt.Println("dataHash", dataHash.Hex())
-	//for _, m := range membs {
-	//	actual, err := getOffchainDataKeys(m, dataHash)
-	//	require.NoError(t, err)
-	//	require.Equal(t, dataHash, actual)
-	//}
+	for _, m := range membs {
+		actual, err := getOffchainDataKeys(m, dataHash)
+		require.NoError(t, err)
+		require.Equal(t, dataHash, actual)
+	}
 }
 
 func hexStringToECDSAPrivateKey(hexKey string) (*ecdsa.PrivateKey, error) {

@@ -28,7 +28,7 @@ func (z *SyncEndpoints) GetOffChainData(hash rpc.ArgHash) (interface{}, rpc.Erro
 	return z.txMan.NewDbTxScope(z.db, func(ctx context.Context, dbTx pgx.Tx) (interface{}, rpc.Error) {
 		data, err := z.db.GetOffChainData(ctx, hash.Hash(), dbTx)
 		if err != nil {
-			return "0x0", rpc.NewRPCError(rpc.DefaultErrorCode, "failed to get the requested data")
+			return "0x0", rpc.NewRPCError(rpc.DefaultErrorCode, "failed to get the requested data", "error", err.Error())
 		}
 
 		return data, nil
